@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Minesweeper</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background-color: #1e1e24;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            height: 100%;
+            max-height: 780px;
+            background: #2a2a35;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        /* Top Information Bar Dashboard Layout */
+        #dashboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #18181f;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #3e3e4f;
+        }
+        .stat-box {
+            background: #2a2a35;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+        }
+        /* Grid Playfield Box Frame styling */
+        #board-wrapper {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            overflow: auto;
+        }
+        #minefield {
+            display: grid;
+            gap: 2px;
+            background-color: #3e3e4f;
+            padding: 2px;
+            border-radius: 6px;
+            margin: auto;
+        }
+        .cell {
+            width: 34px;
+            height: 34px;
+            background: #4a4a5a;
+            border-radius: 3px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .cell:active {
+            background: #5a5a6a;
+        }
+        .cell.revealed {
+            background: #bcbcc4;
+            color: #000;
+        }
+        .cell.mine {
+            background: #ff3b30 !important;
+        }
+        .cell.flagged {
+            background: #ffcc00;
+        }
+        /* Number coloration classes matched structurally */
+        .n-1 { color: #0044ff; }
+        .n-2 { color: #008800; }
+        .n-3 { color: #ff0000; }
+        .n-4 { color: #000088; }
+        .n-5 { color: #880000; }
+        .n-6 { color: #008888; }
+        .n-7 { color: #000000; }
+        .n-8 { color: #444444; }
+
+        /* Action bar for switching interaction modes on mobile devices */
+        #action-bar {
+            height: 80px;
+            background: #18181f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            border-top: 2px solid #3e3e4f;
+        }
+        .toggle-mode-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            background: #34c759;
+            color: white;
+            box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);
+        }
+        .toggle-mode-btn.flagging {
+            background: #ffcc00;
+            color: black;
+            box-shadow: 0 4px 10px rgba(255, 204, 0, 0.3);
+        }
+
+        /* Screen Overlays definitions */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 20, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 20px;
+            text-align: center;
+        }
+        .hidden {
+            display: none !important;
+        }
+        h1 {
+            font-size: 2.5rem;
+            color: #34c759;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+        p {
+            color: #aaa;
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 35px;
+            max-width: 280px;
+        }
+        .action-btn {
+            padding: 15px 45px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: #34c759;
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(52, 199, 89, 0.4);
+        }
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="dashboard">
+            <div class="stat-box">💣 <span id="mine-count">10</span></div>
+            <div class="stat-box">⏱️ <span id="timer-count">000</span></div>
+        </div>
+
+        <div id="home-screen" class="screen">
+            <h1>MINESWEEPER</h1>
+            <p>Clear the grid safely without hitting a hidden explosive mine.<br><br>Toggle <b>Flag Mode</b> at the bottom to safely mark hidden dangers.</p>
+            <button class="action-btn" id="start-btn">START GAME</button>
+        </div>
+
+        <div id="end-screen" class="screen hidden">
+            <h1 id="end-title">GAME OVER</h1>
+            <p id="end-body">Cleared in 0 seconds!</p>
+            <button class="action-btn" id="restart-btn">PLAY AGAIN</button>
+        </div>
+
+        <div id="board-wrapper">
+            <div id="minefield"></div>
+        </div>
+
+        <div id="action-bar">
+            <button class="toggle-mode-btn" id="mode-toggle">
+                <span>Mode:</span> <span id="mode-status">⛏️ DIGGING</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Parameters structural configurations (Optimized responsive scaling standard format profile matrix)
+        const rows = 10;
+        const cols = 9;
+        const totalMines = 10;
+
+        // Interactive Object State Memory variables
+        let grid = [];
+        let minesPlanted = false;
+        let activeMode = "DIG"; // Alternative: "FLAG" toggle target
+        let gameActive = false;
+        let timeElapsed = 0;
+        let clockTimerId = null;
+        let operationalFlagsPlaced = 0;
+
+        // UI Hook Reference Elements
+        const homeScreen = document.getElementById('home-screen');
+        const endScreen = document.getElementById('end-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const minefield = document.getElementById('minefield');
+        const modeToggle = document.getElementById('mode-toggle');
+        const modeStatus = document.getElementById('mode-status');
+        const mineCountText = document.getElementById('mine-count');
+        const timerCountText = document.getElementById('timer-count');
+        const endTitle = document.getElementById('end-title');
+        const endBody = document.getElementById('end-body');
+
+        // --- CONTROLS SWITCHES IMPLEMENTATION HANDLERS ---
+        modeToggle.addEventListener('click', () => {
+            if(activeMode === "DIG") {
+                activeMode = "FLAG";
+                modeToggle.classList.add('flagging');
+                modeStatus.innerText = "🚩 FLAGGING";
+            } else {
+                activeMode = "DIG";
+                modeToggle.classList.remove('flagging');
+                modeStatus.innerText = "⛏️ DIGGING";
+            }
+        });
+
+        // Universal Board Initializer Structure Configuration Loop
+        function buildGridMap() {
+            minefield.innerHTML = '';
+            minefield.style.gridTemplateColumns = `repeat(${cols}, 34px)`;
+            grid = [];
+            operationalFlagsPlaced = 0;
+            mineCountText.innerText = totalMines;
+            
+            for(let r=0; r<rows; r++) {
+                grid[r] = [];
+                for(let c=0; c<cols; c++) {
+                    const domCell = document.createElement('div');
+                    domCell.classList.add('cell');
+                    domCell.dataset.row = r;
+                    domCell.dataset.col = c;
+                    
+                    // Route event handlers to single input management router logic
+                    domCell.addEventListener('click', () => handleCellInteraction(r, c));
+                    
+                    minefield.appendChild(domCell);
+                    
+                    grid[r][c] = {
+                        row: r,
+                        col: c,
+                        isMine: false,
+                        isRevealed: false,
+                        isFlagged: false,
+                        neighborMinesCount: 0,
+                        element: domCell
+                    };
+                }
+            }
+        }
+
+        // Generate and position mines array setup *after* user executes their first action to prevent instant loss
+        function generateMinesField(initialRow, initialCol) {
+            let minesPlacedCounter = 0;
+            while(minesPlacedCounter < totalMines) {
+                let randR = Math.floor(Math.random() * rows);
+                let randC = Math.floor(Math.random() * cols);
+                
+                // Keep mines away from the first selected cell and its immediate neighbors
+                if(!grid[randR][randC].isMine && (Math.abs(randR - initialRow) > 1 || Math.abs(randC - initialCol) > 1)) {
+                    grid[randR][randC].isMine = true;
+                    minesPlacedCounter++;
+                }
+            }
+
+            // Calculate operational proximity matrices layout parameters updates numbers values
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    if(!grid[r][c].isMine) {
+                        let matches = 0;
+                        traverseNeighbors(r, c, (neighborCell) => {
+                            if(neighborCell.isMine) matches++;
+                        });
+                        grid[r][c].neighborMinesCount = matches;
+                    }
+                }
+            }
+        }
+
+        function traverseNeighbors(r, c, actionCallback) {
+            for(let i = -1; i <= 1; i++) {
+                for(let j = -1; j <= 1; j++) {
+                    if(i === 0 && j === 0) continue;
+                    let targetR = r + i;
+                    let targetC = c + j;
+                    if(targetR >= 0 && targetR < rows && targetC >= 0 && targetC < cols) {
+                        actionCallback(grid[targetR][targetC]);
+                    }
+                }
+            }
+        }
+
+        // --- CORE GAME INTERACTION ROUTER LOGIC ---
+        function handleCellInteraction(r, c) {
+            if(!gameActive) return;
+            let cell = grid[r][c];
+            if(cell.isRevealed) return;
+
+            if(activeMode === "FLAG") {
+                // Flag modification toggle logic metrics
+                if(cell.isFlagged) {
+                    cell.isFlagged = false;
+                    cell.element.classList.remove('flagged');
+                    cell.element.innerText = '';
+                    operationalFlagsPlaced--;
+                } else {
+                    cell.isFlagged = true;
+                    cell.element.classList.add('flagged');
+                    cell.element.innerText = '🚩';
+                    operationalFlagsPlaced++;
+                }
+                mineCountText.innerText = Math.max(0, totalMines - operationalFlagsPlaced);
+            } else {
+                // Dig mode logic verification processing loop paths
+                if(cell.isFlagged) return; // Prevent accidentally digging flagged safe coordinates
+
+                if(!minesPlanted) {
+                    generateMinesField(r, c);
+                    minesPlanted = true;
+                    startTimerClock();
+                }
+
+                if(cell.isMine) {
+                    revealExplosionDefeat(cell);
+                } else {
+                    executeRevealCascade(cell);
+                    checkVictoryValidationConditions();
+                }
+            }
+        }
+
+        function executeRevealCascade(cell) {
+            if(cell.isRevealed || cell.isFlagged) return;
+            
+            cell.isRevealed = true;
+            cell.element.classList.add('revealed');
+            
+            if(cell.neighborMinesCount > 0) {
+                cell.element.innerText = cell.neighborMinesCount;
+                cell.element.classList.add(`n-${cell.neighborMinesCount}`);
+            } else {
+                // Instantly expand outwards recursively to uncover adjacent unmined space blocks spaces
+                traverseNeighbors(cell.row, cell.col, (neighbor) => {
+                    executeRevealCascade(neighbor);
+                });
+            }
+        }
+
+        function checkVictoryValidationConditions() {
+            let matchesRevealed = 0;
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    if(grid[r][c].isRevealed) matchesRevealed++;
+                }
+            }
+            // If all non-mine coordinates are uncovered, trigger a win condition
+            if(matchesRevealed === (rows * cols) - totalMines) {
+                endGameSequence(true);
+            }
+        }
+
+        function revealExplosionDefeat(detonatedCell) {
+            // Uncover all explosive node positions across the grid matrix mapping arrays
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    if(grid[r][c].isMine) {
+                        grid[r][c].element.classList.add('mine');
+                        grid[r][c].element.innerText = '💣';
+                    }
+                }
+            }
+            endGameSequence(false);
+        }
+
+        // --- TIMING DATA METRICS INTERACTION TASKS SYSTEM ---
+        function startTimerClock() {
+            timeElapsed = 0;
+            clockTimerId = setInterval(() => {
+                timeElapsed++;
+                timerCountText.innerText = String(timeElapsed).padStart(3, '0');
+                if(timeElapsed >= 999) clearInterval(clockTimerId); // Cap out text field dimensions cleanly
+            }, 1000);
+        }
+
+        function resetTimerClock() {
+            clearInterval(clockTimerId);
+            timerCountText.innerText = "000";
+            timeElapsed = 0;
+        }
+
+        // --- SCENE NAVIGATION HANDLERS ---
+        function runGameStart() {
+            homeScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            resetTimerClock();
+            minesPlanted = false;
+            gameActive = true;
+            buildGridMap();
+        }
+
+        function endGameSequence(isVictory) {
+            gameActive = false;
+            clearInterval(clockTimerId);
+            
+            if(isVictory) {
+                endTitle.innerText = "VICTORY!";
+                endTitle.style.color = "#34c759";
+                endBody.innerText = `Sector safely cleared in ${timeElapsed} seconds flat!`;
+            } else {
+                endTitle.innerText = "DETONATION DETECTED";
+                endTitle.style.color = "#ff3b30";
+                endBody.innerText = "You triggered a hidden explosive mine.";
+            }
+            
+            setTimeout(() => {
+                endScreen.classList.remove('hidden');
+            }, 1400); // Leave a short window for the grid's final state to be visible
+        }
+
+        startBtn.addEventListener('click', runGameStart);
+        restartBtn.addEventListener('click', runGameStart);
+    </script>
+</body>
+</html>
